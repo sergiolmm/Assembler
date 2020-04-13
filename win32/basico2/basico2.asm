@@ -11,47 +11,14 @@ include \masm32\include\windows.inc
 ; include das bibliotecas básicas do windows
 include \masm32\include\user32.inc
 include \masm32\include\kernel32.inc
+include \masm32\include\gdi32.inc
 
 
 includelib \masm32\lib\user32.lib
 includelib \masm32\lib\kernel32.lib
+includelib \masm32\lib\gdi32.lib
 
-
-; definição de MACROS a serem utilizadas no programa para facilitar a vida
-
-      ; 1. szText
-      ; A macro to insert TEXT into the code section for convenient and 
-      ; more intuitive coding of functions that use byte data as text.
-
-      szText MACRO Name, Text:VARARG
-        LOCAL lbl
-          jmp lbl
-            Name db Text,0
-          lbl:
-        ENDM
-
-      ; 2. m2m
-      ; There is no mnemonic to copy from one memory location to another,
-      ; this macro saves repeated coding of this process and is easier to
-      ; read in complex code.
-
-      m2m MACRO M1, M2
-        push M2
-        pop  M1
-      ENDM
-
-      ; 3. return
-      ; Every procedure MUST have a "ret" to return the instruction
-      ; pointer EIP back to the next instruction after the call that
-      ; branched to it. This macro puts a return value in eax and
-      ; makes the "ret" instruction on one line. It is mainly used
-      ; for clear coding in complex conditionals in large branching
-      ; code such as the WndProc procedure.
-
-      return MACRO arg
-        mov eax, arg
-        ret
-      ENDM
+include macros.inc
 
 ; quaquer procedimento que for escrito 
 ; deve ter o seu prototipo descrito aqui.
@@ -62,11 +29,19 @@ WndProc PROTO :DWORD,:DWORD,:DWORD,:DWORD
 TopXY PROTO   :DWORD,:DWORD
 
 
+.data?
+    hitpoint POINT <>
+    posx  dd ?
+    posy  dd ?
+
+
 .data   ; area de dados já inicializados.
     szDisplayName db "Basico Cotuca 2020",0 
     CommandLine   dd 0  ; parametros passados pela linha de comando (ponteiro)
     hWnd          dd 0  ; Handle principal do programa no windows
     hInstance     dd 0  ; instancia do programa
+
+    MouseClick    db 0 ; 0 = no click yet
 
 .code   ; parte do codigo
 
@@ -183,6 +158,8 @@ WndProc proc hWin   :DWORD,
              wParam :DWORD,
              lParam :DWORD
 
+    LOCAL hdc:HDC
+    LOCAL ps:PAINTSTRUCT
 ; -------------------------------------------------------------------------
 ; Message are sent by the operating system to an application through the
 ; WndProc proc. Each message can have additional values associated with it
@@ -207,6 +184,10 @@ WndProc proc hWin   :DWORD,
         .elseif wParam == 1900
             szText TheMsg,"Assembler, Pure & Simple"
             invoke MessageBox,hWin,ADDR TheMsg,ADDR szDisplayName,MB_OK
+
+        .elseif wParam == 1001
+            szText msg2,"Aula de Assembler Cotuca 2020"
+            invoke MessageBox,hWin,ADDR msg2,ADDR szDisplayName,MB_YESNOCANCEL
         .endif
 
     ;====== end menu commands ======
@@ -221,6 +202,34 @@ WndProc proc hWin   :DWORD,
     ; or child windows.
     ; --------------------------------------------------------------------
 
+    ;; lparam da mensagem traz as posições x e y do mouse
+    .elseif uMsg == WM_LBUTTONDOWN
+
+        mov     eax, lParam
+        and     eax, 0FFFFh
+        mov     hitpoint.x, eax
+        mov     posx, eax
+        mov     eax, lParam
+        shr     eax, 16  ; desloca o registrador eax de 16 bits para a direita ->
+        mov     hitpoint.y, eax
+        mov     posy, eax
+        mov     MouseClick, TRUE
+        invoke  InvalidateRect, hWin, NULL, TRUE ; 
+
+
+    .elseif uMsg == WM_PAINT
+        invoke BeginPaint, hWin, ADDR ps
+        mov    hdc, eax
+        .if MouseClick
+            invoke  lstrlen, ADDR szDisplayName
+            invoke  TextOut, hdc, posx, posy, ADDR szDisplayName, eax
+        .endif
+        
+        szText MSG3,"Assembler, Pure & Simple"
+        invoke  lstrlen, ADDR MSG3
+        invoke  TextOut, hdc, 40, 40, ADDR MSG3, eax
+
+        invoke EndPaint, hWin, ADDR ps
     .elseif uMsg == WM_CLOSE
     ; -------------------------------------------------------------------
     ; This is the place where various requirements are performed before

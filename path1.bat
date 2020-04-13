@@ -1,0 +1,1 @@
+path=%path%;c:\masm32\bin;c:\masm32\lib;c:\masm32\include
